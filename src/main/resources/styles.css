@@ -224,3 +224,16 @@
     -fx-border-color: rgba(255, 255, 255, 0.1);
     -fx-border-width: 0.5;
 }
+
+.export-button {
+    -fx-background-color: rgba(16, 185, 129, 0.1);
+    -fx-border-color: rgba(16, 185, 129, 0.3);
+    -fx-text-fill: #34d399;
+    -fx-font-weight: 700;
+}
+
+.export-button:hover {
+    -fx-background-color: #10b981;
+    -fx-text-fill: white;
+    -fx-border-color: #34d399;
+}

@@ -90,6 +90,7 @@
                 </padding>
             </Separator>
             <Button text="Custom" onAction="#handleCustomFilter"/>
+            <Button text="Export" onAction="#handleExport" styleClass="export-button"/>
         </HBox>
     </bottom>
 </BorderPane>

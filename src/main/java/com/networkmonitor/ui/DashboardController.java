@@ -12,6 +12,10 @@ import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
+import javafx.stage.FileChooser;
+
+import java.io.PrintWriter;
+import java.io.IOException;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -49,6 +53,8 @@ public class DashboardController {
 
     private long totalDownloadBytes = 0;
     private long totalUploadBytes = 0;
+    private long lastSelectionStart = 0;
+    private long lastSelectionEnd = 0;
 
     @FXML
     public void initialize() {
@@ -204,6 +210,8 @@ public class DashboardController {
     }
 
     private void reloadChart(long start, long end) {
+        this.lastSelectionStart = start;
+        this.lastSelectionEnd = end;
         downloadSeries.getData().clear();
         uploadSeries.getData().clear();
 
@@ -303,6 +311,59 @@ public class DashboardController {
             String timeLabel = sdf.format(new Date(record.getTimestamp()));
             downloadSeries.getData().add(new XYChart.Data<>(timeLabel, record.getDownloadBytes() / (1024.0 * 1024.0)));
             uploadSeries.getData().add(new XYChart.Data<>(timeLabel, record.getUploadBytes() / (1024.0 * 1024.0)));
+        }
+    }
+
+    @FXML
+    public void handleExport(ActionEvent event) {
+        long start, end;
+        if (isLive) {
+            end = System.currentTimeMillis();
+            start = end - currentWindowMillis;
+        } else {
+            start = lastSelectionStart;
+            end = lastSelectionEnd;
+        }
+
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Export Usage Data");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV Files", "*.csv"));
+        fileChooser.setInitialFileName("network_usage_export.csv");
+
+        java.io.File file = fileChooser.showSaveDialog(filterBar.getScene().getWindow());
+        if (file != null) {
+            exportToCSV(file, start, end);
+        }
+    }
+
+    private void exportToCSV(java.io.File file, long start, long end) {
+        List<UsageRecord> records = databaseManager.getUsageInRange(start, end);
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+        try (PrintWriter writer = new PrintWriter(file)) {
+            writer.println("Timestamp,Date,Download_Bytes,Upload_Bytes");
+            for (UsageRecord record : records) {
+                writer.printf("%d,%s,%d,%d%n",
+                        record.getTimestamp(),
+                        sdf.format(new Date(record.getTimestamp())),
+                        record.getDownloadBytes(),
+                        record.getUploadBytes());
+            }
+
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                    javafx.scene.control.Alert.AlertType.INFORMATION);
+            alert.setTitle("Export Successful");
+            alert.setHeaderText(null);
+            alert.setContentText("Data exported successfully to " + file.getName());
+            alert.showAndWait();
+
+        } catch (IOException e) {
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                    javafx.scene.control.Alert.AlertType.ERROR);
+            alert.setTitle("Export Error");
+            alert.setHeaderText("Failed to export data");
+            alert.setContentText(e.getMessage());
+            alert.showAndWait();
         }
     }
 
