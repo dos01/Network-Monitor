@@ -201,6 +201,25 @@ public class DatabaseManager {
         return defaultValue;
     }
 
+    public void performAutoCleanup() {
+        // Delete records older than 1 year (365 days)
+        long yearAgo = System.currentTimeMillis() - (365L * 24 * 60 * 60 * 1000);
+        clearDataInRange(0, yearAgo);
+        System.out.println("Auto-cleanup: Removed records older than " + new java.util.Date(yearAgo));
+    }
+
+    public void clearDataInRange(long startMillis, long endMillis) {
+        String sql = "DELETE FROM network_usage WHERE timestamp BETWEEN ? AND ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setLong(1, startMillis);
+            pstmt.setLong(2, endMillis);
+            int rows = pstmt.executeUpdate();
+            System.out.println("Cleanup: Deleted " + rows + " records.");
+        } catch (SQLException e) {
+            System.err.println("Error clearing data: " + e.getMessage());
+        }
+    }
+
     public void closeConnection() {
         try {
             if (connection != null && !connection.isClosed()) {

@@ -81,6 +81,9 @@ public class DashboardController {
         alertThresholdPercent = Integer.parseInt(databaseManager.getSetting("alert_threshold_percent", "80"));
         lastAlertMonth = databaseManager.getSetting("last_alert_month", "");
 
+        // Perform auto-cleanup on startup
+        databaseManager.performAutoCleanup();
+
         // Load initial data (e.g., last 30 mins)
         loadChartData(System.currentTimeMillis() - 1800 * 1000, System.currentTimeMillis());
     }
@@ -304,6 +307,45 @@ public class DashboardController {
         grid.add(quotaField, 1, 0);
         grid.add(new javafx.scene.control.Label("Alert at (%):"), 0, 1);
         grid.add(thresholdField, 1, 1);
+
+        // Data Maintenance Section
+        javafx.scene.control.Label maintenanceHeader = new javafx.scene.control.Label("DATA MAINTENANCE");
+        maintenanceHeader.setStyle("-fx-font-weight: bold; -fx-text-fill: #3b82f6; -fx-padding: 10 0 0 0;");
+        grid.add(maintenanceHeader, 0, 2, 2, 1);
+
+        javafx.scene.control.Button clearDataBtn = new javafx.scene.control.Button("Clear History Options...");
+        clearDataBtn.setOnAction(e -> {
+            javafx.scene.control.ChoiceDialog<String> clearDialog = new javafx.scene.control.ChoiceDialog<>(
+                    "Current Filter Range",
+                    "Current Filter Range", "Last 30 Days", "All Time History");
+            clearDialog.setTitle("Clear Network Data");
+            clearDialog.setHeaderText("Choose data to remove");
+            clearDialog.setContentText("Operation cannot be undone:");
+
+            java.util.Optional<String> clearResult = clearDialog.showAndWait();
+            clearResult.ifPresent(choice -> {
+                long now = System.currentTimeMillis();
+                if (choice.equals("All Time History")) {
+                    databaseManager.clearDataInRange(0, now);
+                } else if (choice.equals("Last 30 Days")) {
+                    databaseManager.clearDataInRange(now - (30L * 24 * 60 * 60 * 1000), now);
+                } else {
+                    // Current Filter Range
+                    // We can use the last reload range if available
+                    if (lastSelectionStart > 0 && lastSelectionEnd > 0) {
+                        databaseManager.clearDataInRange(lastSelectionStart, lastSelectionEnd);
+                    } else {
+                        // Fallback to last hour if live
+                        databaseManager.clearDataInRange(now - 3600 * 1000, now);
+                    }
+                }
+                // Refresh chart
+                if (lastSelectionStart > 0) {
+                    reloadChart(lastSelectionStart, lastSelectionEnd);
+                }
+            });
+        });
+        grid.add(clearDataBtn, 0, 3, 2, 1);
 
         dialog.getDialogPane().setContent(grid);
 
