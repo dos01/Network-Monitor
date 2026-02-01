@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.layout.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.chart.*?>
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.layout.Region?>
+
+<BorderPane xmlns="http://javafx.com/javafx/21" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.networkmonitor.ui.DashboardController" stylesheets="@styles.css">
+    <top>
+        <VBox styleClass="header-section">
+            <HBox alignment="BASELINE_LEFT" spacing="0">
+                <Label text="Network Intelligence" styleClass="title-label"/>
+                <Label text="BY DR. DOOLITTLE" styleClass="dev-label"/>
+            </HBox>
+            
+            <HBox spacing="16" alignment="CENTER_LEFT" styleClass="stats-container">
+                <!-- Current Speed Card -->
+                <VBox spacing="8" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                    <Label text="REAL-TIME MONITOR" styleClass="section-header"/>
+                    <HBox spacing="32">
+                        <VBox>
+                            <Label fx:id="downloadSpeedLabel" text="0.0 KB/s" styleClass="download-stat-label"/>
+                            <Label text="Incoming Traffic" styleClass="stat-subtitle"/>
+                        </VBox>
+                        <VBox>
+                            <Label fx:id="uploadSpeedLabel" text="0.0 KB/s" styleClass="upload-stat-label"/>
+                            <Label text="Outgoing Traffic" styleClass="stat-subtitle"/>
+                        </VBox>
+                    </HBox>
+                </VBox>
+
+                <!-- Cumulative Usage Card -->
+                <VBox spacing="8" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                    <Label text="SELECTED PERIOD RANGE" styleClass="section-header"/>
+                    <HBox spacing="32">
+                         <VBox>
+                            <Label fx:id="totalDownloadLabel" text="0.0 MB" styleClass="download-stat-label"/>
+                            <Label text="Total Received" styleClass="stat-subtitle"/>
+                         </VBox>
+                         <VBox>
+                            <Label fx:id="totalUploadLabel" text="0.0 MB" styleClass="upload-stat-label"/>
+                            <Label text="Total Sent" styleClass="stat-subtitle"/>
+                         </VBox>
+                    </HBox>
+                </VBox>
+            </HBox>
+        </VBox>
+    </top>
+    <center>
+        <StackPane>
+            <padding>
+                <Insets top="20" right="20" bottom="20" left="20"/>
+            </padding>
+            <VBox styleClass="stat-card">
+                <HBox alignment="CENTER_LEFT" spacing="10">
+                    <Label text="NETWORK DATA USAGE OVER TIME" styleClass="section-header"/>
+                    <Region HBox.hgrow="ALWAYS" />
+                    <Label fx:id="rangeDescriptionLabel" text="Last 1 Hour (Live)" styleClass="range-badge"/>
+                </HBox>
+                <AreaChart fx:id="usageChart" legendVisible="true" createSymbols="false" prefHeight="400">
+                    <xAxis>
+                        <CategoryAxis fx:id="xAxis" side="BOTTOM" />
+                    </xAxis>
+                    <yAxis>
+                        <NumberAxis fx:id="yAxis" side="LEFT" />
+                    </yAxis>
+                </AreaChart>
+            </VBox>
+        </StackPane>
+    </center>
+    <bottom>
+        <HBox fx:id="filterBar" spacing="8" alignment="CENTER" styleClass="filter-bar">
+            <Button text="5 Min" onAction="#handleTimeFilter"/>
+            <Button text="15 Min" onAction="#handleTimeFilter"/>
+            <Button text="30 Min" onAction="#handleTimeFilter"/>
+            <Button text="1 Hour" onAction="#handleTimeFilter" styleClass="active"/> <!-- Default -->
+            <Separator orientation="VERTICAL" prefHeight="20">
+                <padding>
+                    <Insets left="10" right="10"/>
+                </padding>
+            </Separator>
+            <Button text="3 Hours" onAction="#handleTimeFilter"/>
+            <Button text="24 Hours" onAction="#handleTimeFilter"/>
+            <Button text="1 Week" onAction="#handleTimeFilter"/>
+            <Button text="1 Month" onAction="#handleTimeFilter"/>
+            <Separator orientation="VERTICAL" prefHeight="20">
+                <padding>
+                    <Insets left="10" right="10"/>
+                </padding>
+            </Separator>
+            <Button text="Custom" onAction="#handleCustomFilter"/>
+        </HBox>
+    </bottom>
+</BorderPane>

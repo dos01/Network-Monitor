@@ -1,0 +1,7 @@
+target/
+.idea/
+*.db
+*.log
+dependency-reduced-pom.xml
+output/
+output.txt
