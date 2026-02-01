@@ -56,6 +56,10 @@ public class DashboardController {
     private long lastSelectionStart = 0;
     private long lastSelectionEnd = 0;
 
+    private double monthlyQuotaGB = 0;
+    private int alertThresholdPercent = 80;
+    private boolean alertTriggeredThisMonth = false;
+
     @FXML
     public void initialize() {
         networkTracker = new NetworkTracker();
@@ -65,6 +69,10 @@ public class DashboardController {
 
         executorService = Executors.newSingleThreadScheduledExecutor();
         executorService.scheduleAtFixedRate(this::updateNetworkStats, 0, 2, TimeUnit.SECONDS);
+
+        // Load settings
+        monthlyQuotaGB = Double.parseDouble(databaseManager.getSetting("monthly_quota_gb", "0"));
+        alertThresholdPercent = Integer.parseInt(databaseManager.getSetting("alert_threshold_percent", "80"));
 
         // Load initial data (e.g., last 30 mins)
         loadChartData(System.currentTimeMillis() - 1800 * 1000, System.currentTimeMillis());
@@ -105,7 +113,40 @@ public class DashboardController {
                     totalUploadLabel.setText(formatSize(finalLiveTotal.getUploadBytes()));
                 }
             }
+            checkQuota(record);
         });
+    }
+
+    private void checkQuota(UsageRecord record) {
+        if (monthlyQuotaGB <= 0)
+            return;
+
+        // Current month start
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.set(java.util.Calendar.DAY_OF_MONTH, 1);
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        cal.set(java.util.Calendar.MINUTE, 0);
+        cal.set(java.util.Calendar.SECOND, 0);
+        long startOfMonth = cal.getTimeInMillis();
+
+        UsageRecord monthlyUsage = databaseManager.getTotalUsage(startOfMonth, System.currentTimeMillis());
+        double totalUsedBytes = monthlyUsage.getDownloadBytes() + monthlyUsage.getUploadBytes();
+        double totalUsedGB = totalUsedBytes / (1024.0 * 1024.0 * 1024.0);
+
+        double thresholdGB = (monthlyQuotaGB * alertThresholdPercent) / 100.0;
+
+        if (totalUsedGB >= thresholdGB && !alertTriggeredThisMonth) {
+            alertTriggeredThisMonth = true;
+            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                    javafx.scene.control.Alert.AlertType.WARNING);
+            alert.setTitle("Data Usage Alert");
+            alert.setHeaderText("Threshold Reached");
+            alert.setContentText(String.format("You have used %.2f GB (%.0f%% of your %.1f GB quota).",
+                    totalUsedGB, (totalUsedGB / monthlyQuotaGB) * 100, monthlyQuotaGB));
+            alert.show();
+        } else if (totalUsedGB < thresholdGB) {
+            alertTriggeredThisMonth = false; // Reset if below threshold (e.g. new month or higher quota)
+        }
     }
 
     private void updateLabels(UsageRecord record) {
@@ -207,6 +248,55 @@ public class DashboardController {
             default:
                 return 60 * 60 * 1000;
         }
+    }
+
+    @FXML
+    public void handleSettings(ActionEvent event) {
+        javafx.scene.control.Dialog<javafx.util.Pair<String, String>> dialog = new javafx.scene.control.Dialog<>();
+        dialog.setTitle("Usage Settings");
+        dialog.setHeaderText("Set Monthly Quota & Alerts");
+
+        javafx.scene.control.ButtonType saveButtonType = new javafx.scene.control.ButtonType("Save",
+                javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveButtonType, javafx.scene.control.ButtonType.CANCEL);
+
+        javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(20, 150, 10, 10));
+
+        javafx.scene.control.TextField quotaField = new javafx.scene.control.TextField(String.valueOf(monthlyQuotaGB));
+        javafx.scene.control.TextField thresholdField = new javafx.scene.control.TextField(
+                String.valueOf(alertThresholdPercent));
+
+        grid.add(new javafx.scene.control.Label("Monthly Quota (GB):"), 0, 0);
+        grid.add(quotaField, 1, 0);
+        grid.add(new javafx.scene.control.Label("Alert at (%):"), 0, 1);
+        grid.add(thresholdField, 1, 1);
+
+        dialog.getDialogPane().setContent(grid);
+
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == saveButtonType) {
+                return new javafx.util.Pair<>(quotaField.getText(), thresholdField.getText());
+            }
+            return null;
+        });
+
+        java.util.Optional<javafx.util.Pair<String, String>> result = dialog.showAndWait();
+
+        result.ifPresent(settings -> {
+            try {
+                monthlyQuotaGB = Double.parseDouble(settings.getKey());
+                alertThresholdPercent = Integer.parseInt(settings.getValue());
+
+                databaseManager.saveSetting("monthly_quota_gb", String.valueOf(monthlyQuotaGB));
+                databaseManager.saveSetting("alert_threshold_percent", String.valueOf(alertThresholdPercent));
+                alertTriggeredThisMonth = false; // Reset alert to re-check with new settings
+            } catch (NumberFormatException e) {
+                // Silently fail or show small error
+            }
+        });
     }
 
     private void reloadChart(long start, long end) {

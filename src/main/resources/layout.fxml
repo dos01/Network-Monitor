@@ -12,6 +12,12 @@
             <HBox alignment="BASELINE_LEFT" spacing="0">
                 <Label text="Network Intelligence" styleClass="title-label"/>
                 <Label text="BY DR. DOOLITTLE" styleClass="dev-label"/>
+                <Region HBox.hgrow="ALWAYS" />
+                <Button onAction="#handleSettings" styleClass="settings-button">
+                    <graphic>
+                        <Label text="⚙" style="-fx-text-fill: #94a3b8; -fx-font-size: 20px;"/>
+                    </graphic>
+                </Button>
             </HBox>
             
             <HBox spacing="16" alignment="CENTER_LEFT" styleClass="stats-container">

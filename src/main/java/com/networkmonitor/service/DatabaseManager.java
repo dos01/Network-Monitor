@@ -39,9 +39,15 @@ public class DatabaseManager {
         // Index for faster range queries
         String indexSql = "CREATE INDEX IF NOT EXISTS idx_timestamp ON network_usage(timestamp);";
 
+        String settingsSql = "CREATE TABLE IF NOT EXISTS settings (" +
+                "key TEXT PRIMARY KEY," +
+                "value TEXT" +
+                ");";
+
         try (Statement stmt = connection.createStatement()) {
             stmt.execute(sql);
             stmt.execute(indexSql);
+            stmt.execute(settingsSql);
         } catch (SQLException e) {
             System.err.println("Database initialization failed: " + e.getMessage());
         }
@@ -168,6 +174,31 @@ public class DatabaseManager {
             System.err.println("Error querying daily usage: " + e.getMessage());
         }
         return records;
+    }
+
+    public void saveSetting(String key, String value) {
+        String sql = "INSERT OR REPLACE INTO settings(key, value) VALUES(?, ?)";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, key);
+            pstmt.setString(2, value);
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            System.err.println("Error saving setting: " + e.getMessage());
+        }
+    }
+
+    public String getSetting(String key, String defaultValue) {
+        String sql = "SELECT value FROM settings WHERE key = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, key);
+            ResultSet rs = pstmt.executeQuery();
+            if (rs.next()) {
+                return rs.getString("value");
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting setting: " + e.getMessage());
+        }
+        return defaultValue;
     }
 
     public void closeConnection() {
