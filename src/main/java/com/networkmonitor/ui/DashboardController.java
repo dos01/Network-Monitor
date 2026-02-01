@@ -11,6 +11,7 @@ import javafx.scene.chart.CategoryAxis;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.layout.HBox;
 import javafx.stage.FileChooser;
 
@@ -37,6 +38,10 @@ public class DashboardController {
     @FXML
     private Label rangeDescriptionLabel;
     @FXML
+    private Label quotaStatusLabel;
+    @FXML
+    private ProgressBar quotaProgressBar;
+    @FXML
     private HBox filterBar;
     @FXML
     private AreaChart<String, Number> usageChart;
@@ -56,6 +61,11 @@ public class DashboardController {
     private long lastSelectionStart = 0;
     private long lastSelectionEnd = 0;
 
+    private double monthlyQuotaGB = 0;
+    private int alertThresholdPercent = 80;
+    private boolean alertTriggeredThisMonth = false;
+    private String lastAlertMonth = ""; // Format: YYYY-MM
+
     @FXML
     public void initialize() {
         networkTracker = new NetworkTracker();
@@ -65,6 +75,14 @@ public class DashboardController {
 
         executorService = Executors.newSingleThreadScheduledExecutor();
         executorService.scheduleAtFixedRate(this::updateNetworkStats, 0, 2, TimeUnit.SECONDS);
+
+        // Load settings
+        monthlyQuotaGB = Double.parseDouble(databaseManager.getSetting("monthly_quota_gb", "0"));
+        alertThresholdPercent = Integer.parseInt(databaseManager.getSetting("alert_threshold_percent", "80"));
+        lastAlertMonth = databaseManager.getSetting("last_alert_month", "");
+
+        // Perform auto-cleanup on startup
+        databaseManager.performAutoCleanup();
 
         // Load initial data (e.g., last 30 mins)
         loadChartData(System.currentTimeMillis() - 1800 * 1000, System.currentTimeMillis());
@@ -105,7 +123,64 @@ public class DashboardController {
                     totalUploadLabel.setText(formatSize(finalLiveTotal.getUploadBytes()));
                 }
             }
+            checkQuota(record);
         });
+    }
+
+    private void checkQuota(UsageRecord record) {
+        if (monthlyQuotaGB <= 0) {
+            javafx.application.Platform.runLater(() -> {
+                quotaStatusLabel.setText("Quota not set");
+                quotaProgressBar.setProgress(0.0);
+            });
+            return;
+        }
+
+        // Current month start
+        java.util.Calendar cal = java.util.Calendar.getInstance();
+        cal.set(java.util.Calendar.DAY_OF_MONTH, 1);
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        cal.set(java.util.Calendar.MINUTE, 0);
+        cal.set(java.util.Calendar.SECOND, 0);
+        long startOfMonth = cal.getTimeInMillis();
+
+        UsageRecord monthlyUsage = databaseManager.getTotalUsage(startOfMonth, System.currentTimeMillis());
+        double totalUsedBytes = monthlyUsage.getDownloadBytes() + monthlyUsage.getUploadBytes();
+        double totalUsedGB = totalUsedBytes / (1024.0 * 1024.0 * 1024.0);
+
+        double thresholdGB = (monthlyQuotaGB * alertThresholdPercent) / 100.0;
+        double progress = Math.min(1.0, totalUsedGB / monthlyQuotaGB);
+
+        String currentMonth = new SimpleDateFormat("yyyy-MM").format(new Date());
+
+        javafx.application.Platform.runLater(() -> {
+            quotaStatusLabel.setText(String.format("%.2f GB / %.1f GB (%.0f%%)",
+                    totalUsedGB, monthlyQuotaGB, progress * 100));
+            quotaProgressBar.setProgress(progress);
+
+            if (progress >= (alertThresholdPercent / 100.0)) {
+                if (!quotaProgressBar.getStyleClass().contains("danger")) {
+                    quotaProgressBar.getStyleClass().add("danger");
+                }
+            } else {
+                quotaProgressBar.getStyleClass().remove("danger");
+            }
+        });
+
+        if (totalUsedGB >= thresholdGB && !currentMonth.equals(lastAlertMonth)) {
+            lastAlertMonth = currentMonth;
+            databaseManager.saveSetting("last_alert_month", lastAlertMonth);
+
+            javafx.application.Platform.runLater(() -> {
+                javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                        javafx.scene.control.Alert.AlertType.WARNING);
+                alert.setTitle("Data Usage Alert");
+                alert.setHeaderText("Threshold Reached");
+                alert.setContentText(String.format("You have used %.2f GB (%.0f%% of your %.1f GB quota).",
+                        totalUsedGB, (totalUsedGB / monthlyQuotaGB) * 100, monthlyQuotaGB));
+                alert.show();
+            });
+        }
     }
 
     private void updateLabels(UsageRecord record) {
@@ -207,6 +282,94 @@ public class DashboardController {
             default:
                 return 60 * 60 * 1000;
         }
+    }
+
+    @FXML
+    public void handleSettings(ActionEvent event) {
+        javafx.scene.control.Dialog<javafx.util.Pair<String, String>> dialog = new javafx.scene.control.Dialog<>();
+        dialog.setTitle("Usage Settings");
+        dialog.setHeaderText("Set Monthly Quota & Alerts");
+
+        javafx.scene.control.ButtonType saveButtonType = new javafx.scene.control.ButtonType("Save",
+                javafx.scene.control.ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveButtonType, javafx.scene.control.ButtonType.CANCEL);
+
+        javafx.scene.layout.GridPane grid = new javafx.scene.layout.GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(20, 150, 10, 10));
+
+        javafx.scene.control.TextField quotaField = new javafx.scene.control.TextField(String.valueOf(monthlyQuotaGB));
+        javafx.scene.control.TextField thresholdField = new javafx.scene.control.TextField(
+                String.valueOf(alertThresholdPercent));
+
+        grid.add(new javafx.scene.control.Label("Monthly Quota (GB):"), 0, 0);
+        grid.add(quotaField, 1, 0);
+        grid.add(new javafx.scene.control.Label("Alert at (%):"), 0, 1);
+        grid.add(thresholdField, 1, 1);
+
+        // Data Maintenance Section
+        javafx.scene.control.Label maintenanceHeader = new javafx.scene.control.Label("DATA MAINTENANCE");
+        maintenanceHeader.setStyle("-fx-font-weight: bold; -fx-text-fill: #3b82f6; -fx-padding: 10 0 0 0;");
+        grid.add(maintenanceHeader, 0, 2, 2, 1);
+
+        javafx.scene.control.Button clearDataBtn = new javafx.scene.control.Button("Clear History Options...");
+        clearDataBtn.setOnAction(e -> {
+            javafx.scene.control.ChoiceDialog<String> clearDialog = new javafx.scene.control.ChoiceDialog<>(
+                    "Current Filter Range",
+                    "Current Filter Range", "Last 30 Days", "All Time History");
+            clearDialog.setTitle("Clear Network Data");
+            clearDialog.setHeaderText("Choose data to remove");
+            clearDialog.setContentText("Operation cannot be undone:");
+
+            java.util.Optional<String> clearResult = clearDialog.showAndWait();
+            clearResult.ifPresent(choice -> {
+                long now = System.currentTimeMillis();
+                if (choice.equals("All Time History")) {
+                    databaseManager.clearDataInRange(0, now);
+                } else if (choice.equals("Last 30 Days")) {
+                    databaseManager.clearDataInRange(now - (30L * 24 * 60 * 60 * 1000), now);
+                } else {
+                    // Current Filter Range
+                    // We can use the last reload range if available
+                    if (lastSelectionStart > 0 && lastSelectionEnd > 0) {
+                        databaseManager.clearDataInRange(lastSelectionStart, lastSelectionEnd);
+                    } else {
+                        // Fallback to last hour if live
+                        databaseManager.clearDataInRange(now - 3600 * 1000, now);
+                    }
+                }
+                // Refresh chart
+                if (lastSelectionStart > 0) {
+                    reloadChart(lastSelectionStart, lastSelectionEnd);
+                }
+            });
+        });
+        grid.add(clearDataBtn, 0, 3, 2, 1);
+
+        dialog.getDialogPane().setContent(grid);
+
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == saveButtonType) {
+                return new javafx.util.Pair<>(quotaField.getText(), thresholdField.getText());
+            }
+            return null;
+        });
+
+        java.util.Optional<javafx.util.Pair<String, String>> result = dialog.showAndWait();
+
+        result.ifPresent(settings -> {
+            try {
+                monthlyQuotaGB = Double.parseDouble(settings.getKey());
+                alertThresholdPercent = Integer.parseInt(settings.getValue());
+
+                databaseManager.saveSetting("monthly_quota_gb", String.valueOf(monthlyQuotaGB));
+                databaseManager.saveSetting("alert_threshold_percent", String.valueOf(alertThresholdPercent));
+                alertTriggeredThisMonth = false; // Reset alert to re-check with new settings
+            } catch (NumberFormatException e) {
+                // Silently fail or show small error
+            }
+        });
     }
 
     private void reloadChart(long start, long end) {

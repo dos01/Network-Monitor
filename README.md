@@ -5,25 +5,27 @@ A professional, real-time network traffic monitoring application built with **Ja
 ## Features
 
 - **Real-Time Monitoring**: Live visualization of download and upload speeds.
-- **Dynamic Time Filters**: Analyze data across multiple time windows:
-  - 5 Min, 15 Min, 30 Min
-  - 1 Hour (Live Mode)
-  - 3 Hours, 24 Hours
-  - 1 Week, 1 Month
+- **Dynamic Time Filters**: Analyze data across multiple time windows (5 Min to 1 Month).
 - **Cumulative Usage Tracking**: Displays total received and sent data for any selected period.
-- **Custom Range Selection**: Pick specific start and end dates to analyze historical data.
-- **Persistent Storage**: All network statistics are stored locally using **SQLite** for long-term analysis.
+- **Usage Quotas & Alerts**: Set monthly data limits with a real-time progress tracker on the dashboard and threshold alerts.
+- **Data Export**: Export aggregated daily network usage records to **CSV** format.
+- **Database Maintenance**: 
+  - **Auto-Cleanup**: Automatically deletes data older than 1 year to maintain performance.
+  - **Manual Purge**: Clear history for current filters or all-time via Settings.
+- **Persistent Storage**: All network statistics are stored locally using **SQLite**.
 - **Premium UI**: Modern, dark-themed interface with responsive micro-animations and smooth charts.
 
 ## Tech Stack
 
-- **Lanuage**: Java 17+
+- **Language**: Java 17+
 - **UI Framework**: JavaFX
 - **Graphics**: FXML & Vanilla CSS
 - **Database**: SQLite (via JDBC)
 - **Build Tool**: Maven
 
-## Getting Started
+## Development
+
+Work is ongoing on the `development` branch. All pull requests should be targeted there.
 
 ### Prerequisites
 

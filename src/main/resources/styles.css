@@ -237,3 +237,9 @@
     -fx-text-fill: white;
     -fx-border-color: #34d399;
 }
+
+.quota-label {
+    -fx-text-fill: #94a3b8;
+    -fx-font-size: 14px;
+    -fx-font-weight: 600;
+}
