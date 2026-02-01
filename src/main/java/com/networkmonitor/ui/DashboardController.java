@@ -337,31 +337,35 @@ public class DashboardController {
     }
 
     private void exportToCSV(java.io.File file, long start, long end) {
-        List<UsageRecord> records = databaseManager.getUsageInRange(start, end);
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        List<UsageRecord> records = databaseManager.getDailyUsage(start, end);
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
 
         try (PrintWriter writer = new PrintWriter(file)) {
-            writer.println("Timestamp,Date,Download_Bytes,Upload_Bytes");
+            writer.println("Date,Download_MB,Upload_MB,Total_MB");
             for (UsageRecord record : records) {
-                writer.printf("%d,%s,%d,%d%n",
-                        record.getTimestamp(),
+                double downMB = record.getDownloadBytes() / (1024.0 * 1024.0);
+                double upMB = record.getUploadBytes() / (1024.0 * 1024.0);
+                double totalMB = downMB + upMB;
+
+                writer.printf("%s,%.2f,%.2f,%.2f%n",
                         sdf.format(new Date(record.getTimestamp())),
-                        record.getDownloadBytes(),
-                        record.getUploadBytes());
+                        downMB,
+                        upMB,
+                        totalMB);
             }
 
             javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
                     javafx.scene.control.Alert.AlertType.INFORMATION);
             alert.setTitle("Export Successful");
             alert.setHeaderText(null);
-            alert.setContentText("Data exported successfully to " + file.getName());
+            alert.setContentText("Daily report exported successfully to " + file.getName());
             alert.showAndWait();
 
         } catch (IOException e) {
             javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
                     javafx.scene.control.Alert.AlertType.ERROR);
             alert.setTitle("Export Error");
-            alert.setHeaderText("Failed to export data");
+            alert.setHeaderText("Failed to export report");
             alert.setContentText(e.getMessage());
             alert.showAndWait();
         }

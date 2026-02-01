@@ -137,6 +137,39 @@ public class DatabaseManager {
         return new UsageRecord(endMillis, 0, 0);
     }
 
+    public List<UsageRecord> getDailyUsage(long startMillis, long endMillis) {
+        List<UsageRecord> records = new ArrayList<>();
+        // Group by day using SQLite date formatting
+        String sql = "SELECT strftime('%Y-%m-%d', timestamp / 1000, 'unixepoch', 'localtime') as day, " +
+                "SUM(download_bytes) as total_down, " +
+                "SUM(upload_bytes) as total_up, " +
+                "MAX(timestamp) as last_ts " +
+                "FROM network_usage " +
+                "WHERE timestamp BETWEEN ? AND ? " +
+                "GROUP BY day " +
+                "ORDER BY day ASC";
+
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setLong(1, startMillis);
+            pstmt.setLong(2, endMillis);
+
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                // We reuse UsageRecord; we'll store the day string in the 'date' field in CSV
+                // later,
+                // but for now we store the last_ts to keep it compatible with UsageRecord
+                // constructor
+                records.add(new UsageRecord(
+                        rs.getLong("last_ts"),
+                        rs.getLong("total_down"),
+                        rs.getLong("total_up")));
+            }
+        } catch (SQLException e) {
+            System.err.println("Error querying daily usage: " + e.getMessage());
+        }
+        return records;
+    }
+
     public void closeConnection() {
         try {
             if (connection != null && !connection.isClosed()) {
