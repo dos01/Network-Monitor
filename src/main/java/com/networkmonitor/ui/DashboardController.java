@@ -11,6 +11,7 @@ import javafx.scene.chart.CategoryAxis;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
 import javafx.scene.control.Label;
+import javafx.scene.control.ProgressBar;
 import javafx.scene.layout.HBox;
 import javafx.stage.FileChooser;
 
@@ -37,6 +38,10 @@ public class DashboardController {
     @FXML
     private Label rangeDescriptionLabel;
     @FXML
+    private Label quotaStatusLabel;
+    @FXML
+    private ProgressBar quotaProgressBar;
+    @FXML
     private HBox filterBar;
     @FXML
     private AreaChart<String, Number> usageChart;
@@ -59,6 +64,7 @@ public class DashboardController {
     private double monthlyQuotaGB = 0;
     private int alertThresholdPercent = 80;
     private boolean alertTriggeredThisMonth = false;
+    private String lastAlertMonth = ""; // Format: YYYY-MM
 
     @FXML
     public void initialize() {
@@ -73,6 +79,7 @@ public class DashboardController {
         // Load settings
         monthlyQuotaGB = Double.parseDouble(databaseManager.getSetting("monthly_quota_gb", "0"));
         alertThresholdPercent = Integer.parseInt(databaseManager.getSetting("alert_threshold_percent", "80"));
+        lastAlertMonth = databaseManager.getSetting("last_alert_month", "");
 
         // Load initial data (e.g., last 30 mins)
         loadChartData(System.currentTimeMillis() - 1800 * 1000, System.currentTimeMillis());
@@ -118,8 +125,13 @@ public class DashboardController {
     }
 
     private void checkQuota(UsageRecord record) {
-        if (monthlyQuotaGB <= 0)
+        if (monthlyQuotaGB <= 0) {
+            javafx.application.Platform.runLater(() -> {
+                quotaStatusLabel.setText("Quota not set");
+                quotaProgressBar.setProgress(0.0);
+            });
             return;
+        }
 
         // Current month start
         java.util.Calendar cal = java.util.Calendar.getInstance();
@@ -134,18 +146,37 @@ public class DashboardController {
         double totalUsedGB = totalUsedBytes / (1024.0 * 1024.0 * 1024.0);
 
         double thresholdGB = (monthlyQuotaGB * alertThresholdPercent) / 100.0;
+        double progress = Math.min(1.0, totalUsedGB / monthlyQuotaGB);
 
-        if (totalUsedGB >= thresholdGB && !alertTriggeredThisMonth) {
-            alertTriggeredThisMonth = true;
-            javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
-                    javafx.scene.control.Alert.AlertType.WARNING);
-            alert.setTitle("Data Usage Alert");
-            alert.setHeaderText("Threshold Reached");
-            alert.setContentText(String.format("You have used %.2f GB (%.0f%% of your %.1f GB quota).",
-                    totalUsedGB, (totalUsedGB / monthlyQuotaGB) * 100, monthlyQuotaGB));
-            alert.show();
-        } else if (totalUsedGB < thresholdGB) {
-            alertTriggeredThisMonth = false; // Reset if below threshold (e.g. new month or higher quota)
+        String currentMonth = new SimpleDateFormat("yyyy-MM").format(new Date());
+
+        javafx.application.Platform.runLater(() -> {
+            quotaStatusLabel.setText(String.format("%.2f GB / %.1f GB (%.0f%%)",
+                    totalUsedGB, monthlyQuotaGB, progress * 100));
+            quotaProgressBar.setProgress(progress);
+
+            if (progress >= (alertThresholdPercent / 100.0)) {
+                if (!quotaProgressBar.getStyleClass().contains("danger")) {
+                    quotaProgressBar.getStyleClass().add("danger");
+                }
+            } else {
+                quotaProgressBar.getStyleClass().remove("danger");
+            }
+        });
+
+        if (totalUsedGB >= thresholdGB && !currentMonth.equals(lastAlertMonth)) {
+            lastAlertMonth = currentMonth;
+            databaseManager.saveSetting("last_alert_month", lastAlertMonth);
+
+            javafx.application.Platform.runLater(() -> {
+                javafx.scene.control.Alert alert = new javafx.scene.control.Alert(
+                        javafx.scene.control.Alert.AlertType.WARNING);
+                alert.setTitle("Data Usage Alert");
+                alert.setHeaderText("Threshold Reached");
+                alert.setContentText(String.format("You have used %.2f GB (%.0f%% of your %.1f GB quota).",
+                        totalUsedGB, (totalUsedGB / monthlyQuotaGB) * 100, monthlyQuotaGB));
+                alert.show();
+            });
         }
     }
 

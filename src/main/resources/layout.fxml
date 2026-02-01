@@ -50,6 +50,15 @@
                          </VBox>
                     </HBox>
                 </VBox>
+
+                <!-- Monthly Quota Card -->
+                <VBox spacing="8" styleClass="stat-card" HBox.hgrow="ALWAYS">
+                    <Label text="MONTHLY QUOTA TRACKER" styleClass="section-header"/>
+                    <VBox spacing="4" alignment="CENTER_LEFT">
+                        <Label fx:id="quotaStatusLabel" text="Quota not set" styleClass="quota-label"/>
+                        <ProgressBar fx:id="quotaProgressBar" progress="0.0" maxWidth="Infinity" styleClass="quota-progress-bar"/>
+                    </VBox>
+                </VBox>
             </HBox>
         </VBox>
     </top>
