@@ -48,6 +48,10 @@
                             <Label fx:id="totalUploadLabel" text="0.0 MB" styleClass="upload-stat-label"/>
                             <Label text="Total Sent" styleClass="stat-subtitle"/>
                          </VBox>
+                         <VBox>
+                            <Label fx:id="totalUsageLabel" text="0.0 MB" styleClass="total-stat-label"/>
+                            <Label text="Total Usage" styleClass="stat-subtitle"/>
+                         </VBox>
                     </HBox>
                 </VBox>
 

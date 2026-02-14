@@ -36,6 +36,8 @@ public class DashboardController {
     @FXML
     private Label totalUploadLabel;
     @FXML
+    private Label totalUsageLabel;
+    @FXML
     private Label rangeDescriptionLabel;
     @FXML
     private Label quotaStatusLabel;
@@ -121,6 +123,8 @@ public class DashboardController {
                 if (finalLiveTotal != null) {
                     totalDownloadLabel.setText(formatSize(finalLiveTotal.getDownloadBytes()));
                     totalUploadLabel.setText(formatSize(finalLiveTotal.getUploadBytes()));
+                    totalUsageLabel
+                            .setText(formatSize(finalLiveTotal.getDownloadBytes() + finalLiveTotal.getUploadBytes()));
                 }
             }
             checkQuota(record);
@@ -386,6 +390,7 @@ public class DashboardController {
         UsageRecord total = databaseManager.getTotalUsage(start, end);
         totalDownloadLabel.setText(formatSize(total.getDownloadBytes()));
         totalUploadLabel.setText(formatSize(total.getUploadBytes()));
+        totalUsageLabel.setText(formatSize(total.getDownloadBytes() + total.getUploadBytes()));
     }
 
     @FXML
